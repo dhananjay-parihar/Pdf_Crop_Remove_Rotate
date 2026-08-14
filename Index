@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Toolkit — Remove, Rotate, Crop</title>
+
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<rect width="100" height="100" rx="20" fill="%23f2a93b"/>
+<text x="50%" y="58%" font-size="42" text-anchor="middle" fill="%230f1115" font-family="Arial">PDF</text>
+</svg>' />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* ---- Design tokens: "light table" review desk ---- */
+            --ink-900: #101218;
+            --ink-800: #181b22;
+            --ink-750: #1e222b;
+            --ink-700: #262b35;
+            --ink-600: #363c48;
+            --ink-500: #4b5261;
+            --paper: #fbfbf8;
+            --paper-dim: #f1f1ec;
+            --text-hi: #eef0f3;
+            --text-mid: #9aa1b0;
+            --text-low: #656c7a;
+
+            --amber: #f2a93b;
+            --amber-dim: #7a5c22;
+            --blue: #5b9dff;
+            --violet: #a98bfa;
+            --red: #ff6b6b;
+            --green: #34d399;
+
+            --font-display: 'Space Grotesk', 'Inter', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+
+            --page-size: 168px;
+            --r-sm: 8px;
+            --r-md: 12px;
+            --r-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-body);
+            background: var(--ink-900);
+            color: var(--text-hi);
+        }
+
+        body {
+            display: flex;
+        }
+
+        button {
+            font-family: var(--font-display);
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--ink-600); border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--ink-500); }
+
+        .app {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 8px;
+            overflow: hidden;
+        }
+
+        /* ---------- TOP BAR ---------- */
+
+        .topbar {
+            background: var(--ink-800);
+            border: 1px solid var(--ink-700);
+            border-radius: var(--r-md);
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .topbar-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            min-width: max-content;
+        }
+
+        .brand .mark {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+            background: linear-gradient(145deg, var(--amber), #c9861f);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 11px;
+            color: #241a06;
+        }
+
+        .brand h1 {
+            font-family: var(--font-display);
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+
+        .brand span {
+            font-size: 10.5px;
+            color: var(--text-low);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .divider-v {
+            width: 1px;
+            height: 26px;
+            background: var(--ink-600);
+        }
+
+        .upload-chip {
+            position: relative;
+            overflow: hidden;
+            display: inline-flex;
+        }
+
+        .upload-chip input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-chip-btn {
+            background: var(--ink-700);
+            border: 1px solid var(--ink-600);
+            color: var(--text-hi);
+            padding: 7px 12px;
+            border-radius: var(--r-sm);
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .file-chip {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px 5px 5px;
+            background: var(--ink-750);
+            border: 1px solid var(--ink-600);
+            border-radius: 999px;
+            font-size: 11.5px;
+            max-width: 320px;
+        }
+
+        .file-chip .swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--amber);
+            flex-shrink: 0;
+        }
+
+        .file-chip b {
+            font-weight: 600;
+            color: var(--text-hi);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-chip small {
+            display: block;
+            color: var(--text-low);
+            font-family: var(--font-mono);
+            font-size: 10px;
+        }
+
+        .zoom-ctrl {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: var(--ink-750);
+            border: 1px solid var(--ink-600);
+            border-radius: 999px;
+            font-size: 11px;
+            color: var(--text-mid);
+            font-weight: 600;
+        }
+
+        .zoom-ctrl input[type="range"] {
+            width: 100px;
+            accent-color: var(--amber);
+            cursor: pointer;
+        }
+
+        #zoomValue {
+            min-width: 40px;
+            text-align: right;
+            color: var(--amber);
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .spacer { flex: 1; }
+
+        .btn {
+            border: none;
+            border-radius: var(--r-sm);
+            padding: 8px 13px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .12s ease, filter .12s ease, opacity .12s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover { filter: brightness(1.08); }
+        .btn:active { transform: scale(0.97); }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        .btn-ghost {
+            background: var(--ink-700);
+            color: var(--text-hi);
+            border: 1px solid var(--ink-600);
+        }
+
+        .btn-ghost:hover { background: var(--ink-600); }
+
+        .btn-warn {
+            background: rgba(242, 169, 59, 0.14);
+            color: var(--amber);
+            border: 1px solid rgba(242, 169, 59, 0.35);
+        }
+
+        .btn-danger {
+            background: rgba(255, 107, 107, 0.14);
+            color: var(--red);
+            border: 1px solid rgba(255, 107, 107, 0.35);
+        }
+
+        .btn-primary {
+            background: var(--green);
+            color: #062b1c;
+        }
+
+        .btn-sm { padding: 6px 10px; font-size: 11px; border-radius: 7px; }
+
+        progress {
+            width: 100%;
+            height: 5px;
+            border: none;
+            border-radius: 999px;
+            overflow: hidden;
+            display: none;
+        }
+
+        progress::-webkit-progress-bar { background: var(--ink-700); }
+        progress::-webkit-progress-value { background: linear-gradient(90deg, var(--amber), var(--green)); }
+
+        .status {
+            display: none;
+            color: var(--amber);
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 0 2px;
+        }
+
+        /* ---------- WORKSPACE ---------- */
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+            overflow: hidden;
+        }
+
+        #summaryPanel {
+            width: 190px;
+            flex-shrink: 0;
+            height: 100%;
+            background: var(--ink-800);
+            border: 1px solid var(--ink-700);
+            border-radius: var(--r-md);
+            padding: 10px;
+            overflow: auto;
+            font-size: 11.5px;
+        }
+
+        #summaryPanel .empty {
+            color: var(--text-low);
+            line-height: 1.5;
+            font-size: 11.5px;
+        }
+
+        .panel-label {
+            font-family: var(--font-display);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-low);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .summary-counts {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 12px;
+        }
+
+        .count-pill {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 9px;
+            border-radius: var(--r-sm);
+            background: var(--ink-750);
+            font-weight: 700;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-hi);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 7px;
+        }
+
+        .dot-removed { background: var(--red); }
+        .dot-rotated { background: var(--blue); }
+        .dot-cropped { background: var(--violet); }
+
+        .edit-item {
+            padding: 7px 9px;
+            border-radius: var(--r-sm);
+            border: 1px solid var(--ink-700);
+            margin-bottom: 5px;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--text-mid);
+        }
+
+        .edit-item:hover {
+            background: var(--ink-750);
+            border-color: var(--ink-600);
+            color: var(--text-hi);
+        }
+
+        .viewer {
+            flex: 1;
+            background:
+                radial-gradient(circle at 12% 8%, rgba(242, 169, 59, 0.05), transparent 45%),
+                var(--ink-800);
+            border: 1px solid var(--ink-700);
+            border-radius: var(--r-md);
+            overflow: auto;
+            position: relative;
+        }
+
+        .placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: var(--text-low);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .placeholder .big {
+            font-family: var(--font-display);
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-mid);
+        }
+
+        .pages-grid {
+            padding: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, var(--page-size, 168px));
+            justify-content: start;
+            gap: 14px;
+        }
+
+.page-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.page-controls {
+    display: flex;
+    gap: 4px;
+    
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 8px;
+
+    z-index: 20;
+    
+    padding: 4px;
+    background: rgba(24, 27, 34, 0.92);
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+}
+
+        .page-card {
+            transition: border .2s ease, box-shadow .2s ease, opacity .2s ease, filter .2s ease, transform .12s ease;
+            background: var(--paper);
+            border: 1px solid var(--ink-700);
+            border-radius: var(--r-sm);
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+        }
+
+        .page-card.removed {
+            opacity: .38;
+            filter: grayscale(1);
+        }
+
+        .page-header {
+            padding: 5px 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            border-bottom: 1px solid var(--ink-700);
+            background: var(--ink-750);
+            color: var(--text-mid);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .badges {
+            display: flex;
+            gap: 3px;
+        }
+
+        .badge {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 999px;
+            color: #0f1115;
+        }
+
+        .badge-rotate { background: var(--blue); }
+        .badge-crop { background: var(--violet); }
+
+        .canvas-wrap {
+            position: relative;
+            line-height: 0;
+            user-select: none;
+            cursor: zoom-in;
+        }
+
+        canvas {
+            width: 100%;
+            display: block;
+        }
+
+        .zoom-hint {
+            position: absolute;
+            right: 5px;
+            bottom: 5px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(16, 18, 24, 0.55);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity .15s ease;
+            pointer-events: none;
+        }
+
+        .canvas-wrap:hover .zoom-hint { opacity: 1; }
+
+        .removed-stamp {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-family: var(--font-display);
+            font-weight: 800;
+            color: var(--red);
+            letter-spacing: 2px;
+            transform: rotate(-18deg);
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(255, 255, 255, .8);
+        }
+
+        .page-card.removed .removed-stamp { display: flex; }
+
+        .crop-mask {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(16, 18, 24, .45);
+            border: 2px dashed var(--violet);
+            display: none;
+        }
+
+        .crop-overlay {
+            position: absolute;
+            inset: 0;
+            cursor: crosshair;
+            touch-action: none;
+            display: none;
+        }
+
+        .canvas-wrap.crop-active { cursor: default; }
+        .canvas-wrap.crop-active .crop-overlay { display: block; }
+
+        .crop-drag-rect {
+            position: absolute;
+            border: 2px dashed var(--violet);
+            background: rgba(169, 139, 250, .18);
+            pointer-events: none;
+            display: none;
+        }
+
+        .page-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .page-controls button {
+            flex: 1;
+            padding: 6px 3px;
+            border-radius: 7px;
+            font-size: 10px;
+            font-weight: 600;
+            border: 1px solid var(--ink-600);
+            background: var(--ink-750);
+            color: var(--text-mid);
+            cursor: pointer;
+        }
+
+        .page-controls button:hover { color: var(--text-hi); border-color: var(--ink-500); }
+
+        .page-controls button.active {
+            background: var(--blue);
+            color: #061224;
+            border-color: var(--blue);
+        }
+
+        .page-controls button.remove-btn.active {
+            background: var(--red);
+            border-color: var(--red);
+            color: #260707;
+        }
+
+        .page-controls button.crop-btn.active {
+            background: var(--violet);
+            border-color: var(--violet);
+            color: #1c0f38;
+        }
+
+        .page-controls button.crop-clear {
+            flex: 0 0 auto;
+            width: 26px;
+            color: var(--red);
+        }
+
+        .loader {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #fff;
+            border-radius: 50%;
+            display: inline-block;
+            animation: spin .7s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---------- FULLSCREEN VIEWER MODAL (signature element) ---------- */
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(6, 7, 10, 0.92);
+            backdrop-filter: blur(3px);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+        }
+
+        .modal-backdrop.open { display: flex; }
+
+        .modal-topbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            flex-wrap: wrap;
+        }
+
+        .modal-title {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-hi);
+            background: var(--ink-750);
+            border: 1px solid var(--ink-600);
+            padding: 6px 12px;
+            border-radius: 999px;
+        }
+
+        .modal-title b { color: var(--amber); }
+
+        .modal-zoomgroup {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--ink-750);
+            border: 1px solid var(--ink-600);
+            border-radius: 999px;
+            padding: 4px 6px;
+        }
+
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-hi);
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover { background: var(--ink-600); }
+
+        .modal-zoomgroup input[type="range"] {
+            width: 110px;
+            accent-color: var(--amber);
+            cursor: pointer;
+        }
+
+        #modalZoomValue {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--amber);
+            min-width: 38px;
+            text-align: center;
+        }
+
+        .modal-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .modal-close {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid var(--ink-600);
+            background: var(--ink-750);
+            color: var(--text-hi);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover { background: var(--red); color: #260707; border-color: var(--red); }
+
+        .modal-stage {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            min-height: 0;
+        }
+
+        .modal-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--ink-600);
+            background: rgba(24, 27, 34, 0.75);
+            color: var(--text-hi);
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 5;
+        }
+
+        .modal-nav-btn:hover { background: var(--amber); color: #241a06; border-color: var(--amber); }
+        .modal-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        #modalPrevBtn { left: 18px; }
+        #modalNextBtn { right: 18px; }
+
+.modal-canvas-viewport {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+
+    /* Keep PDF at the TOP */
+    align-items: flex-start;
+
+    /* Keep PDF horizontally centered */
+    justify-content: center;
+
+    cursor: grab;
+}
+
+        .modal-canvas-viewport.grabbing { cursor: grabbing; }
+
+.modal-canvas-inner {
+    position: relative;
+    line-height: 0;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: transform .06s linear;
+
+    /* IMPORTANT */
+    transform-origin: top center;
+}
+
+        #modalCanvas {
+            display: block;
+            background: var(--paper);
+        }
+
+        .modal-crop-mask {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(16, 18, 24, .5);
+            border: 2px dashed var(--violet);
+            display: none;
+        }
+
+        .modal-removed-banner {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--red);
+            color: #260707;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 11px;
+            padding: 5px 14px;
+            border-radius: 999px;
+            display: none;
+            letter-spacing: 0.04em;
+            z-index: 6;
+        }
+
+        .modal-removed-banner.show { display: block; }
+
+        .modal-bottombar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px 12px;
+        }
+
+        .modal-quickactions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .modal-quickactions button {
+            border: 1px solid var(--ink-600);
+            background: var(--ink-750);
+            color: var(--text-hi);
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .modal-quickactions button:hover { background: var(--ink-600); }
+        .modal-quickactions button.active.remove-active { background: var(--red); border-color: var(--red); color: #260707; }
+
+        .filmstrip {
+            flex: 1;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 3px 2px;
+        }
+
+        .filmstrip img {
+            height: 46px;
+            border-radius: 5px;
+            border: 2px solid var(--ink-600);
+            opacity: 0.55;
+            cursor: pointer;
+            flex-shrink: 0;
+            background: var(--paper);
+        }
+
+        .filmstrip img:hover { opacity: 0.85; }
+
+        .filmstrip img.current {
+            opacity: 1;
+            border-color: var(--amber);
+        }
+
+        .filmstrip .fs-removed { filter: grayscale(1); opacity: 0.3; }
+
+        .kbd-hint {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-low);
+            white-space: nowrap;
+        }
+
+        @media(max-width:900px) {
+            .app { flex-direction: column; }
+            .workspace { flex-direction: column; }
+            #summaryPanel { width: 100%; max-height: 130px; }
+            .modal-nav-btn { width: 36px; height: 36px; font-size: 14px; }
+            .kbd-hint { display: none; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app">
+
+        <div class="topbar">
+
+            <div class="topbar-row">
+
+                <div class="brand">
+                    <span class="mark">PDF</span>
+                    <div>
+                        <h1>PDF Toolkit</h1>
+                        <span>Remove &middot; Rotate &middot; Crop</span>
+                    </div>
+                </div>
+
+                <div class="divider-v"></div>
+
+                <label class="upload-chip">
+                    <input type="file" id="pdfInput" accept="application/pdf" />
+                    <span class="upload-chip-btn">⇪ Choose PDF</span>
+                </label>
+
+                <div class="file-chip" id="fileInfo">
+                    <div class="swatch"></div>
+                    <div>
+                        <b id="fileName"></b>
+                        <small id="fileMeta"></small>
+                    </div>
+                </div>
+
+                <div class="zoom-ctrl">
+                    <span>Grid</span>
+                    <input type="range" id="zoomSlider" min="120" max="460" value="168" />
+                    <span id="zoomValue">168px</span>
+                </div>
+
+                <div class="spacer"></div>
+
+                <button class="btn btn-primary" id="downloadBtn">⬇ Download Edited PDF</button>
+                <button class="btn btn-danger" id="clearBtn">Remove PDF</button>
+            </div>
+
+            <div class="topbar-row">
+                <button class="btn btn-ghost btn-sm" id="rotateAllLeftBtn">↺ Rotate All Left</button>
+                <button class="btn btn-ghost btn-sm" id="rotateAllRightBtn">↻ Rotate All Right</button>
+                <button class="btn btn-warn btn-sm" id="resetAllBtn">Reset All Edits</button>
+                <div class="spacer"></div>
+                <div class="status" id="statusBox"></div>
+            </div>
+
+            <progress id="progressBar" value="0" max="100"></progress>
+
+        </div>
+
+        <div class="workspace">
+
+            <div id="summaryPanel">
+                <div class="empty">No edits yet. Upload a PDF, then use each page's Remove, Rotate and Crop
+                    controls. Click any page to open the full-size zoom viewer.</div>
+            </div>
+
+            <div class="viewer">
+                <div class="placeholder" id="placeholder">
+                    <div class="big">Nothing loaded yet</div>
+                    <div>Choose a PDF above to preview, edit and zoom into its pages</div>
+                </div>
+                <div class="pages-grid" id="pagesContainer"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ---------- Fullscreen zoom / pan viewer ---------- -->
+    <div class="modal-backdrop" id="pageModal">
+        <div class="modal-topbar">
+            <div class="modal-title">Page <b id="modalPageNum">1</b> / <span id="modalPageTotal">1</span></div>
+
+            <div class="modal-zoomgroup">
+                <button class="icon-btn" id="modalZoomOutBtn" title="Zoom out">−</button>
+                <input type="range" id="modalZoomSlider" min="50" max="400" value="100" />
+                <span id="modalZoomValue">100%</span>
+                <button class="icon-btn" id="modalZoomInBtn" title="Zoom in">+</button>
+                <button class="icon-btn" id="modalFitBtn" title="Reset zoom">⤢</button>
+            </div>
+
+            <span class="kbd-hint">Scroll to zoom · drag to pan · ← → to change page · Esc to close</span>
+
+            <div class="spacer"></div>
+
+            <div class="modal-actions">
+                <button class="modal-close" id="modalCloseBtn" title="Close">✕</button>
+            </div>
+        </div>
+
+        <div class="modal-stage">
+            <button class="modal-nav-btn" id="modalPrevBtn">‹</button>
+
+            <div class="modal-canvas-viewport" id="modalViewport">
+                <div class="modal-canvas-inner" id="modalCanvasInner">
+                    <canvas id="modalCanvas"></canvas>
+                    <div class="modal-crop-mask" id="modalCropMask"></div>
+                </div>
+            </div>
+            <div class="modal-removed-banner" id="modalRemovedBanner">PAGE MARKED FOR REMOVAL</div>
+
+            <button class="modal-nav-btn" id="modalNextBtn">›</button>
+        </div>
+
+        <div class="modal-bottombar">
+            <div class="modal-quickactions">
+                <button id="modalRemoveBtn">🗑 Remove</button>
+                <button id="modalRotateBtn">↻ Rotate</button>
+            </div>
+            <div class="filmstrip" id="filmstrip"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        const pdfInput = document.getElementById('pdfInput');
+        const pagesContainer = document.getElementById('pagesContainer');
+        const placeholder = document.getElementById('placeholder');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileMeta = document.getElementById('fileMeta');
+        const summaryPanel = document.getElementById('summaryPanel');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const resetAllBtn = document.getElementById('resetAllBtn');
+        const rotateAllLeftBtn = document.getElementById('rotateAllLeftBtn');
+        const rotateAllRightBtn = document.getElementById('rotateAllRightBtn');
+        const progressBar = document.getElementById('progressBar');
+        const statusBox = document.getElementById('statusBox');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomValue = document.getElementById('zoomValue');
+
+        let pdfArrayBuffer = null;
+        let pdfDoc = null;           // pdf.js document
+        let totalPages = 0;
+        let pagePreviewSize = 168;
+
+        const RENDER_PIXEL_RATIO = Math.min(window.devicePixelRatio || 1, 2);
+        const resizeObservers = [];
+        let pageStates = [];         // { rotation, removed, crop:{x,y,width,height}|null }
+        let pdfjsPages = [];         // cached pdf.js page proxies
+        let viewports = [];          // current viewport per page (for coordinate conversion)
+        let cardEls = [];            // dom refs per page
+
+        function showStatus(message) {
+            statusBox.style.display = 'block';
+            statusBox.innerHTML = message;
+        }
+
+        function hideStatus() {
+            setTimeout(() => { statusBox.style.display = 'none'; }, 1800);
+        }
+
+        function setLoading(button, text) {
+            button.disabled = true;
+            button.dataset.original = button.innerHTML;
+            button.innerHTML = `<span class="loader"></span>${text}`;
+        }
+
+        function resetButton(button) {
+            button.disabled = false;
+            button.innerHTML = button.dataset.original;
+        }
+
+        function formatSize(bytes) {
+            if (bytes > 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+            return (bytes / 1024).toFixed(2) + ' KB';
+        }
+
+        function updateZoom(size) {
+            pagePreviewSize = size;
+            document.documentElement.style.setProperty('--page-size', size + 'px');
+            zoomValue.textContent = size + 'px';
+        }
+
+        zoomSlider.addEventListener('input', (e) => updateZoom(e.target.value));
+
+        // ---------- Coordinate helpers ----------
+
+        function fractionToPdfPoint(viewport, fx, fy) {
+            return viewport.convertToPdfPoint(fx * viewport.width, fy * viewport.height);
+        }
+
+        function pdfPointToFraction(viewport, x, y) {
+            const p = viewport.convertToViewportPoint(x, y);
+            return [p[0] / viewport.width, p[1] / viewport.height];
+        }
+
+        // ---------- Loading ----------
+
+        async function loadFile(file) {
+            disconnectResizeObservers();
+            pdfArrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: pdfArrayBuffer.slice(0) });
+            pdfDoc = await loadingTask.promise;
+            totalPages = pdfDoc.numPages;
+
+            pagesContainer.innerHTML = '';
+            pageStates = [];
+            pdfjsPages = [];
+            viewports = [];
+            cardEls = [];
+
+            fileInfo.style.display = 'flex';
+            fileName.textContent = file.name;
+            fileMeta.textContent = `${totalPages} pages · ${formatSize(file.size)}`;
+            placeholder.style.display = 'none';
+
+            for (let i = 0; i < totalPages; i++) {
+                const pageNum = i + 1;
+                const pdfPage = await pdfDoc.getPage(pageNum);
+                pdfjsPages.push(pdfPage);
+                pageStates.push({ rotation: pdfPage.rotate || 0, removed: false, crop: null });
+                buildPageCard(i);
+                await renderPage(i);
+            }
+
+            refreshSummary();
+        }
+
+        function buildPageCard(index) {
+            const pageNum = index + 1;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'page-wrapper';
+
+            const card = document.createElement('div');
+            card.className = 'page-card';
+
+            const header = document.createElement('div');
+            header.className = 'page-header';
+            header.innerHTML = `
+                <span>PG ${String(pageNum).padStart(2, '0')}</span>
+                <span class="badges" id="badges-${index}"></span>
+            `;
+
+            const canvasWrap = document.createElement('div');
+            canvasWrap.className = 'canvas-wrap';
+            canvasWrap.id = `canvaswrap-${index}`;
+
+            const canvas = document.createElement('canvas');
+            canvas.id = `canvas-${index}`;
+
+            const stamp = document.createElement('div');
+            stamp.className = 'removed-stamp';
+            stamp.textContent = 'REMOVED';
+
+            const mask = document.createElement('div');
+            mask.className = 'crop-mask';
+            mask.id = `mask-${index}`;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'crop-overlay';
+            overlay.id = `overlay-${index}`;
+
+            const dragRect = document.createElement('div');
+            dragRect.className = 'crop-drag-rect';
+            dragRect.id = `dragrect-${index}`;
+
+            const zoomHint = document.createElement('div');
+            zoomHint.className = 'zoom-hint';
+            zoomHint.textContent = '⤢';
+
+            canvasWrap.appendChild(canvas);
+            canvasWrap.appendChild(stamp);
+            canvasWrap.appendChild(mask);
+            canvasWrap.appendChild(overlay);
+            canvasWrap.appendChild(dragRect);
+            canvasWrap.appendChild(zoomHint);
+
+            const controls = document.createElement('div');
+            controls.className = 'page-controls';
+            controls.innerHTML = `
+                <button class="remove-btn" id="removebtn-${index}">🗑 Remove</button>
+                <button class="rotate-btn" id="rotatebtn-${index}">↻ Rotate</button>
+                <button class="crop-btn" id="cropbtn-${index}">▢ Crop</button>
+                <button class="crop-clear" id="cropclear-${index}" title="Clear crop">✕</button>
+            `;
+
+            card.appendChild(header);
+            card.appendChild(canvasWrap);
+            wrapper.appendChild(card);
+            wrapper.appendChild(controls);
+            pagesContainer.appendChild(wrapper);
+
+            cardEls[index] = { wrapper, card, canvas, canvasWrap, overlay, dragRect, mask };
+
+            document.getElementById(`removebtn-${index}`).addEventListener('click', (e) => { e.stopPropagation(); toggleRemove(index); });
+            document.getElementById(`rotatebtn-${index}`).addEventListener('click', (e) => { e.stopPropagation(); rotatePage(index, 90); });
+            document.getElementById(`cropbtn-${index}`).addEventListener('click', (e) => { e.stopPropagation(); toggleCropMode(index); });
+            document.getElementById(`cropclear-${index}`).addEventListener('click', (e) => { e.stopPropagation(); clearCrop(index); });
+
+            // Click a page (outside crop mode / crop drag) to open the full-size zoom viewer
+            canvasWrap.addEventListener('click', () => {
+                if (canvasWrap.classList.contains('crop-active')) return;
+                openModal(index);
+            });
+
+            setupCropDrag(index);
+            setupResizeObserver(index);
+        }
+
+        function setupResizeObserver(index) {
+            const { canvas, canvasWrap } = cardEls[index];
+            let debounceTimer = null;
+
+            const ro = new ResizeObserver(() => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    const displayedWidth = canvasWrap.clientWidth;
+                    const currentRasterWidth = canvas.width / RENDER_PIXEL_RATIO;
+                    if (!displayedWidth) return;
+                    if (displayedWidth > currentRasterWidth * 1.03 || displayedWidth < currentRasterWidth * 0.55) {
+                        renderPage(index);
+                    }
+                }, 180);
+            });
+
+            ro.observe(canvasWrap);
+            resizeObservers[index] = ro;
+        }
+
+        function disconnectResizeObservers() {
+            resizeObservers.forEach(ro => ro && ro.disconnect());
+            resizeObservers.length = 0;
+        }
+
+        async function renderPage(index) {
+            const pdfPage = pdfjsPages[index];
+            const state = pageStates[index];
+            const { canvas, canvasWrap } = cardEls[index];
+
+            const displayWidth = canvasWrap.clientWidth || pagePreviewSize;
+            const renderWidth = Math.max(displayWidth * RENDER_PIXEL_RATIO, 300);
+
+            const unscaled = pdfPage.getViewport({ scale: 1, rotation: state.rotation });
+            const scale = renderWidth / unscaled.width;
+            const viewport = pdfPage.getViewport({ scale, rotation: state.rotation });
+            viewports[index] = viewport;
+
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            const ctx = canvas.getContext('2d');
+            await pdfPage.render({ canvasContext: ctx, viewport }).promise;
+
+            applyRemovedVisual(index);
+            redrawCropOverlay(index);
+            refreshBadges(index);
+
+            if (modalOpen && currentModalIndex === index) renderModalPage(index, true);
+            if (modalOpen) refreshFilmstripThumb(index);
+        }
+
+        function refreshBadges(index) {
+            const state = pageStates[index];
+            const el = document.getElementById(`badges-${index}`);
+            let html = '';
+            if (state.rotation % 360 !== 0) html += `<span class="badge badge-rotate">${state.rotation}°</span>`;
+            if (state.crop) html += `<span class="badge badge-crop">Crop</span>`;
+            el.innerHTML = html;
+
+            document.getElementById(`removebtn-${index}`).classList.toggle('active', state.removed);
+            document.getElementById(`removebtn-${index}`).textContent = state.removed ? '✓ Removed' : '🗑 Remove';
+            document.getElementById(`cropbtn-${index}`).classList.toggle('active', !!cardEls[index].canvasWrap.classList.contains('crop-active'));
+        }
+
+        function applyRemovedVisual(index) {
+            cardEls[index].card.classList.toggle('removed', pageStates[index].removed);
+        }
+
+        // ---------- Remove ----------
+
+        function toggleRemove(index) {
+            pageStates[index].removed = !pageStates[index].removed;
+            applyRemovedVisual(index);
+            refreshBadges(index);
+            refreshSummary();
+            if (modalOpen && currentModalIndex === index) syncModalRemovedState(index);
+        }
+
+        // ---------- Rotate ----------
+
+        async function rotatePage(index, delta) {
+            pageStates[index].rotation = ((pageStates[index].rotation + delta) % 360 + 360) % 360;
+            await renderPage(index);
+            refreshSummary();
+        }
+
+        async function rotateAll(delta) {
+            for (let i = 0; i < totalPages; i++) {
+                pageStates[i].rotation = ((pageStates[i].rotation + delta) % 360 + 360) % 360;
+                await renderPage(i);
+            }
+            refreshSummary();
+        }
+
+        rotateAllLeftBtn.addEventListener('click', () => rotateAll(-90));
+        rotateAllRightBtn.addEventListener('click', () => rotateAll(90));
+
+        // ---------- Crop ----------
+
+        function toggleCropMode(index) {
+            cardEls.forEach((c, i) => {
+                if (i !== index) c.canvasWrap.classList.remove('crop-active');
+            });
+            cardEls[index].canvasWrap.classList.toggle('crop-active');
+            refreshBadges(index);
+        }
+
+        function clearCrop(index) {
+            pageStates[index].crop = null;
+            redrawCropOverlay(index);
+            refreshBadges(index);
+            refreshSummary();
+            if (modalOpen && currentModalIndex === index) redrawModalCropMask(index);
+        }
+
+        function setupCropDrag(index) {
+            const { overlay, dragRect, canvasWrap } = cardEls[index];
+            let dragging = false;
+            let startX = 0, startY = 0;
+
+            function getFrac(e) {
+                const rect = overlay.getBoundingClientRect();
+                const fx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                const fy = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+                return [fx, fy];
+            }
+
+            overlay.addEventListener('pointerdown', (e) => {
+                dragging = true;
+                overlay.setPointerCapture(e.pointerId);
+                const [fx, fy] = getFrac(e);
+                startX = fx; startY = fy;
+                dragRect.style.display = 'block';
+                dragRect.style.left = (fx * 100) + '%';
+                dragRect.style.top = (fy * 100) + '%';
+                dragRect.style.width = '0%';
+                dragRect.style.height = '0%';
+            });
+
+            overlay.addEventListener('pointermove', (e) => {
+                if (!dragging) return;
+                const [fx, fy] = getFrac(e);
+                const left = Math.min(startX, fx), top = Math.min(startY, fy);
+                const w = Math.abs(fx - startX), h = Math.abs(fy - startY);
+                dragRect.style.left = (left * 100) + '%';
+                dragRect.style.top = (top * 100) + '%';
+                dragRect.style.width = (w * 100) + '%';
+                dragRect.style.height = (h * 100) + '%';
+            });
+
+            function finishDrag(e) {
+                if (!dragging) return;
+                dragging = false;
+                const [fx, fy] = getFrac(e);
+                const left = Math.min(startX, fx), top = Math.min(startY, fy);
+                const right = Math.max(startX, fx), bottom = Math.max(startY, fy);
+                dragRect.style.display = 'none';
+
+                if ((right - left) < 0.02 || (bottom - top) < 0.02) {
+                    canvasWrap.classList.remove('crop-active');
+                    refreshBadges(index);
+                    return;
+                }
+
+                const viewport = viewports[index];
+                const p1 = fractionToPdfPoint(viewport, left, top);
+                const p2 = fractionToPdfPoint(viewport, right, bottom);
+                const xMin = Math.min(p1[0], p2[0]);
+                const xMax = Math.max(p1[0], p2[0]);
+                const yMin = Math.min(p1[1], p2[1]);
+                const yMax = Math.max(p1[1], p2[1]);
+
+                pageStates[index].crop = { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+
+                canvasWrap.classList.remove('crop-active');
+                redrawCropOverlay(index);
+                refreshBadges(index);
+                refreshSummary();
+                if (modalOpen && currentModalIndex === index) redrawModalCropMask(index);
+            }
+
+            overlay.addEventListener('pointerup', finishDrag);
+            overlay.addEventListener('pointercancel', finishDrag);
+        }
+
+        function redrawCropOverlay(index) {
+            const { mask } = cardEls[index];
+            const crop = pageStates[index].crop;
+            const viewport = viewports[index];
+
+            if (!crop || !viewport) {
+                mask.style.display = 'none';
+                return;
+            }
+
+            const c1 = pdfPointToFraction(viewport, crop.x, crop.y);
+            const c2 = pdfPointToFraction(viewport, crop.x + crop.width, crop.y + crop.height);
+            const left = Math.min(c1[0], c2[0]);
+            const top = Math.min(c1[1], c2[1]);
+            const right = Math.max(c1[0], c2[0]);
+            const bottom = Math.max(c1[1], c2[1]);
+
+            mask.style.display = 'block';
+            mask.style.left = (left * 100) + '%';
+            mask.style.top = (top * 100) + '%';
+            mask.style.width = ((right - left) * 100) + '%';
+            mask.style.height = ((bottom - top) * 100) + '%';
+        }
+
+        // ---------- Summary panel ----------
+
+        function refreshSummary() {
+            const removed = pageStates.filter(s => s.removed).length;
+            const rotated = pageStates.filter(s => s.rotation % 360 !== 0).length;
+            const cropped = pageStates.filter(s => s.crop).length;
+            const editedIndices = pageStates
+                .map((s, i) => ({ s, i }))
+                .filter(({ s }) => s.removed || s.rotation % 360 !== 0 || s.crop);
+
+            if (totalPages === 0) {
+                summaryPanel.innerHTML = '<div class="empty">No edits yet. Upload a PDF, then use each page\'s Remove, Rotate and Crop controls. Click any page to open the full-size zoom viewer.</div>';
+                return;
+            }
+
+            let html = `
+                <div class="panel-label">Summary</div>
+                <div class="summary-counts">
+                    <div class="count-pill"><span><span class="dot dot-removed"></span>Removed</span><span>${removed}</span></div>
+                    <div class="count-pill"><span><span class="dot dot-rotated"></span>Rotated</span><span>${rotated}</span></div>
+                    <div class="count-pill"><span><span class="dot dot-cropped"></span>Cropped</span><span>${cropped}</span></div>
+                </div>
+            `;
+
+            if (editedIndices.length === 0) {
+                html += '<div class="empty">No pages edited yet.</div>';
+            } else {
+                html += '<div class="panel-label">Edited pages</div>';
+                html += editedIndices.map(({ s, i }) => {
+                    const parts = [];
+                    if (s.removed) parts.push('Removed');
+                    if (s.rotation % 360 !== 0) parts.push(`Rotated ${s.rotation}°`);
+                    if (s.crop) parts.push('Cropped');
+                    return `<div class="edit-item" data-index="${i}">Pg ${i + 1} — ${parts.join(', ')}</div>`;
+                }).join('');
+            }
+
+            summaryPanel.innerHTML = html;
+
+            summaryPanel.querySelectorAll('.edit-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const idx = parseInt(item.dataset.index);
+                    cardEls[idx].wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            });
+        }
+
+        // ---------- Reset ----------
+
+        resetAllBtn.addEventListener('click', async () => {
+            if (totalPages === 0) return;
+            for (let i = 0; i < totalPages; i++) {
+                const pdfPage = pdfjsPages[i];
+                pageStates[i] = { rotation: pdfPage.rotate || 0, removed: false, crop: null };
+                await renderPage(i);
+            }
+            refreshSummary();
+        });
+
+        // ---------- Download ----------
+
+        downloadBtn.addEventListener('click', async () => {
+            if (!pdfArrayBuffer) {
+                alert('Upload a PDF first');
+                return;
+            }
+
+            const keepIndices = pageStates.map((s, i) => i).filter(i => !pageStates[i].removed);
+
+            if (keepIndices.length === 0) {
+                alert('All pages are marked for removal — nothing left to export');
+                return;
+            }
+
+            setLoading(downloadBtn, 'Generating');
+            showStatus('Applying edits and building the PDF...');
+            progressBar.style.display = 'block';
+            progressBar.value = 10;
+
+            try {
+                const srcDoc = await PDFLib.PDFDocument.load(pdfArrayBuffer);
+                const newDoc = await PDFLib.PDFDocument.create();
+
+                const copiedPages = await newDoc.copyPages(srcDoc, keepIndices);
+                progressBar.value = 50;
+
+                copiedPages.forEach((page, idx) => {
+                    const origIndex = keepIndices[idx];
+                    const state = pageStates[origIndex];
+
+                    page.setRotation(PDFLib.degrees(state.rotation));
+
+                    if (state.crop) {
+                        page.setCropBox(state.crop.x, state.crop.y, state.crop.width, state.crop.height);
+                    }
+
+                    newDoc.addPage(page);
+                });
+
+                progressBar.value = 80;
+
+                const bytes = await newDoc.save();
+                const outName = pdfInput.files[0].name.replace(/\.[^/.]+$/, '');
+                saveAs(new Blob([bytes], { type: 'application/pdf' }), `${outName}_edited.pdf`);
+
+                progressBar.value = 100;
+                showStatus(`Downloaded — ${keepIndices.length} page(s) exported`);
+
+            } catch (err) {
+                console.error(err);
+                alert('Something went wrong while generating the PDF');
+            } finally {
+                resetButton(downloadBtn);
+                hideStatus();
+                setTimeout(() => {
+                    progressBar.value = 0;
+                    progressBar.style.display = 'none';
+                }, 800);
+            }
+        });
+
+        // ---------- Upload / Clear ----------
+
+        pdfInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            await loadFile(file);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            disconnectResizeObservers();
+            closeModal();
+            pdfInput.value = '';
+            pdfArrayBuffer = null;
+            pdfDoc = null;
+            totalPages = 0;
+            pageStates = [];
+            pdfjsPages = [];
+            viewports = [];
+            cardEls = [];
+
+            pagesContainer.innerHTML = '';
+            placeholder.style.display = 'flex';
+            fileInfo.style.display = 'none';
+            progressBar.value = 0;
+            progressBar.style.display = 'none';
+            updateZoom(168);
+            refreshSummary();
+        });
+
+        /* =========================================================
+           FULLSCREEN ZOOM / PAN VIEWER
+           Click any page thumbnail to open a distraction-free, full
+           window view of that page with wheel-to-zoom, drag-to-pan,
+           a filmstrip to jump between pages, and quick remove/rotate.
+           ========================================================= */
+
+        const pageModal = document.getElementById('pageModal');
+        const modalViewport = document.getElementById('modalViewport');
+        const modalCanvasInner = document.getElementById('modalCanvasInner');
+        const modalCanvas = document.getElementById('modalCanvas');
+        const modalCropMask = document.getElementById('modalCropMask');
+        const modalPageNum = document.getElementById('modalPageNum');
+        const modalPageTotal = document.getElementById('modalPageTotal');
+        const modalZoomSlider = document.getElementById('modalZoomSlider');
+        const modalZoomValue = document.getElementById('modalZoomValue');
+        const modalZoomInBtn = document.getElementById('modalZoomInBtn');
+        const modalZoomOutBtn = document.getElementById('modalZoomOutBtn');
+        const modalFitBtn = document.getElementById('modalFitBtn');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const modalPrevBtn = document.getElementById('modalPrevBtn');
+        const modalNextBtn = document.getElementById('modalNextBtn');
+        const modalRemoveBtn = document.getElementById('modalRemoveBtn');
+        const modalRotateBtn = document.getElementById('modalRotateBtn');
+        const modalRemovedBanner = document.getElementById('modalRemovedBanner');
+        const filmstrip = document.getElementById('filmstrip');
+
+        let modalOpen = false;
+        let currentModalIndex = -1;
+        let modalZoom = 1;
+        let modalPanX = 0;
+        let modalPanY = 0;
+        let modalViewportRef = null;
+
+        function openModal(index) {
+            if (totalPages === 0) return;
+            currentModalIndex = index;
+            modalOpen = true;
+            pageModal.classList.add('open');
+            modalPageTotal.textContent = totalPages;
+            buildFilmstrip();
+            renderModalPage(index);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            modalOpen = false;
+            pageModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        modalCloseBtn.addEventListener('click', closeModal);
+        pageModal.addEventListener('click', (e) => { if (e.target === pageModal) closeModal(); });
+
+        async function renderModalPage(index, keepView) {
+            const pdfPage = pdfjsPages[index];
+            const state = pageStates[index];
+
+            const targetWidth = Math.min(2200, Math.max(1000, window.innerWidth * RENDER_PIXEL_RATIO * 0.85));
+            const unscaled = pdfPage.getViewport({ scale: 1, rotation: state.rotation });
+            const scale = targetWidth / unscaled.width;
+            const viewport = pdfPage.getViewport({ scale, rotation: state.rotation });
+            modalViewportRef = viewport;
+
+            modalCanvas.width = viewport.width;
+            modalCanvas.height = viewport.height;
+            const ctx = modalCanvas.getContext('2d');
+            await pdfPage.render({ canvasContext: ctx, viewport }).promise;
+
+            modalPageNum.textContent = index + 1;
+            modalPrevBtn.disabled = index === 0;
+            modalNextBtn.disabled = index === totalPages - 1;
+
+            syncModalRemovedState(index);
+            redrawModalCropMask(index);
+            updateModalQuickActionLabels(index);
+            highlightFilmstrip(index);
+
+            if (!keepView) resetModalZoom();
+        }
+
+        function syncModalRemovedState(index) {
+            modalRemovedBanner.classList.toggle('show', pageStates[index].removed);
+        }
+
+        function redrawModalCropMask(index) {
+            const crop = pageStates[index].crop;
+            if (!crop || !modalViewportRef) {
+                modalCropMask.style.display = 'none';
+                return;
+            }
+            const c1 = pdfPointToFraction(modalViewportRef, crop.x, crop.y);
+            const c2 = pdfPointToFraction(modalViewportRef, crop.x + crop.width, crop.y + crop.height);
+            const left = Math.min(c1[0], c2[0]);
+            const top = Math.min(c1[1], c2[1]);
+            const right = Math.max(c1[0], c2[0]);
+            const bottom = Math.max(c1[1], c2[1]);
+            modalCropMask.style.display = 'block';
+            modalCropMask.style.left = (left * 100) + '%';
+            modalCropMask.style.top = (top * 100) + '%';
+            modalCropMask.style.width = ((right - left) * 100) + '%';
+            modalCropMask.style.height = ((bottom - top) * 100) + '%';
+        }
+
+        function updateModalQuickActionLabels(index) {
+            const state = pageStates[index];
+            modalRemoveBtn.textContent = state.removed ? '✓ Removed (click to restore)' : '🗑 Remove page';
+            modalRemoveBtn.classList.toggle('remove-active', state.removed);
+            modalRotateBtn.textContent = `↻ Rotate (${state.rotation}°)`;
+        }
+
+        modalRemoveBtn.addEventListener('click', () => {
+            if (currentModalIndex < 0) return;
+            toggleRemove(currentModalIndex);
+            updateModalQuickActionLabels(currentModalIndex);
+        });
+
+        modalRotateBtn.addEventListener('click', async () => {
+            if (currentModalIndex < 0) return;
+            await rotatePage(currentModalIndex, 90);
+            updateModalQuickActionLabels(currentModalIndex);
+        });
+
+        function gotoModalPage(delta) {
+            const next = currentModalIndex + delta;
+            if (next < 0 || next >= totalPages) return;
+            currentModalIndex = next;
+            renderModalPage(next);
+        }
+
+        modalPrevBtn.addEventListener('click', () => gotoModalPage(-1));
+        modalNextBtn.addEventListener('click', () => gotoModalPage(1));
+
+        // ---- Zoom / pan ----
+
+        function applyModalTransform() {
+            modalCanvasInner.style.transform = `translate(${modalPanX}px, ${modalPanY}px) scale(${modalZoom})`;
+            modalZoomSlider.value = Math.round(modalZoom * 100);
+            modalZoomValue.textContent = Math.round(modalZoom * 100) + '%';
+            modalViewport.classList.toggle('grabbing', false);
+        }
+
+        function setModalZoom(newZoom, anchorClientX, anchorClientY) {
+            const clamped = Math.min(4, Math.max(0.5, newZoom));
+            if (anchorClientX !== undefined) {
+                const rect = modalViewport.getBoundingClientRect();
+                const cx = anchorClientX - rect.left - rect.width / 2;
+                const cy = anchorClientY - rect.top - rect.height / 2;
+                const ratio = clamped / modalZoom;
+                modalPanX = cx - (cx - modalPanX) * ratio;
+                modalPanY = cy - (cy - modalPanY) * ratio;
+            }
+            modalZoom = clamped;
+            applyModalTransform();
+        }
+
+        function resetModalZoom() {
+            modalZoom = 1;
+            modalPanX = 0;
+            modalPanY = 0;
+            applyModalTransform();
+        }
+
+       modalZoomInBtn.addEventListener('click', () => {
+    modalPanY = 0;
+    setModalZoom(modalZoom + 0.25);
+});
+
+modalZoomOutBtn.addEventListener('click', () => {
+    modalPanY = 0;
+    setModalZoom(modalZoom - 0.25);
+});
+
+modalFitBtn.addEventListener('click', resetModalZoom);
+
+modalZoomSlider.addEventListener('input', (e) => {
+    modalPanY = 0;
+    setModalZoom(parseInt(e.target.value) / 100);
+});
+        modalZoomSlider.addEventListener('input', (e) => setModalZoom(parseInt(e.target.value) / 100));
+
+        modalViewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = -e.deltaY * 0.0016;
+            setModalZoom(modalZoom + delta, e.clientX, e.clientY);
+        }, { passive: false });
+
+        let panDragging = false;
+        let panStartX = 0, panStartY = 0, panOriginX = 0, panOriginY = 0;
+
+        modalViewport.addEventListener('pointerdown', (e) => {
+            panDragging = true;
+            modalViewport.classList.add('grabbing');
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            panOriginX = modalPanX;
+            panOriginY = modalPanY;
+            modalViewport.setPointerCapture(e.pointerId);
+        });
+
+        modalViewport.addEventListener('pointermove', (e) => {
+            if (!panDragging) return;
+            modalPanX = panOriginX + (e.clientX - panStartX);
+            modalPanY = panOriginY + (e.clientY - panStartY);
+            applyModalTransform();
+        });
+
+        function endPan() {
+            panDragging = false;
+            modalViewport.classList.remove('grabbing');
+        }
+        modalViewport.addEventListener('pointerup', endPan);
+        modalViewport.addEventListener('pointercancel', endPan);
+
+        modalViewport.addEventListener('dblclick', () => {
+            setModalZoom(modalZoom >= 2 ? 1 : 2);
+        });
+
+        // ---- Filmstrip ----
+
+        function buildFilmstrip() {
+            filmstrip.innerHTML = '';
+            for (let i = 0; i < totalPages; i++) {
+                const img = document.createElement('img');
+                img.id = `fs-${i}`;
+                img.src = cardEls[i].canvas.toDataURL('image/jpeg', 0.6);
+                img.className = pageStates[i].removed ? 'fs-removed' : '';
+                img.title = `Page ${i + 1}`;
+                img.addEventListener('click', () => {
+                    currentModalIndex = i;
+                    renderModalPage(i);
+                });
+                filmstrip.appendChild(img);
+            }
+            highlightFilmstrip(currentModalIndex);
+        }
+
+        function refreshFilmstripThumb(index) {
+            const img = document.getElementById(`fs-${index}`);
+            if (!img) return;
+            img.src = cardEls[index].canvas.toDataURL('image/jpeg', 0.6);
+            img.className = pageStates[index].removed ? 'fs-removed' : '';
+            if (index === currentModalIndex) img.classList.add('current');
+        }
+
+        function highlightFilmstrip(index) {
+            filmstrip.querySelectorAll('img').forEach((img, i) => {
+                img.classList.toggle('current', i === index);
+            });
+            const current = document.getElementById(`fs-${index}`);
+            if (current) current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+
+        // ---- Keyboard shortcuts ----
+
+        document.addEventListener('keydown', (e) => {
+            if (!modalOpen) return;
+            if (e.key === 'Escape') closeModal();
+            else if (e.key === 'ArrowLeft') gotoModalPage(-1);
+            else if (e.key === 'ArrowRight') gotoModalPage(1);
+            else if (e.key === '+' || e.key === '=') setModalZoom(modalZoom + 0.25);
+            else if (e.key === '-' || e.key === '_') setModalZoom(modalZoom - 0.25);
+            else if (e.key === '0') resetModalZoom();
+        });
+
+    </script>
+
+</body>
+
+</html>
