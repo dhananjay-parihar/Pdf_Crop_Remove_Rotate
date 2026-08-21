@@ -14,7 +14,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -42,7 +42,7 @@
             --font-body: 'Inter', sans-serif;
             --font-mono: 'IBM Plex Mono', monospace;
 
-            --page-size: 168px;
+            --page-size: 300px;
             --r-sm: 8px;
             --r-md: 12px;
             --r-lg: 16px;
@@ -287,6 +287,12 @@
             color: #062b1c;
         }
 
+        .btn-violet {
+            background: rgba(169, 139, 250, 0.16);
+            color: var(--violet);
+            border: 1px solid rgba(169, 139, 250, 0.4);
+        }
+
         .btn-sm { padding: 6px 10px; font-size: 11px; border-radius: 7px; }
 
         progress {
@@ -429,7 +435,7 @@
         .pages-grid {
             padding: 14px;
             display: grid;
-            grid-template-columns: repeat(auto-fill, var(--page-size, 168px));
+            grid-template-columns: repeat(auto-fill, var(--page-size, 300px));
             justify-content: start;
             gap: 14px;
         }
@@ -456,6 +462,7 @@
     background: rgba(24, 27, 34, 0.92);
     border-radius: 8px;
     backdrop-filter: blur(4px);
+    flex-wrap: wrap;
 }
 
         .page-card {
@@ -579,11 +586,6 @@
             display: none;
         }
 
-        .page-controls {
-            display: flex;
-            gap: 4px;
-        }
-
         .page-controls button {
             flex: 1;
             padding: 6px 3px;
@@ -597,6 +599,16 @@
         }
 
         .page-controls button:hover { color: var(--text-hi); border-color: var(--ink-500); }
+
+        .page-controls button:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+        }
+
+        .page-controls button:disabled:hover {
+            color: var(--text-mid);
+            border-color: var(--ink-600);
+        }
 
         .page-controls button.active {
             background: var(--blue);
@@ -620,6 +632,12 @@
             flex: 0 0 auto;
             width: 26px;
             color: var(--red);
+        }
+
+        .page-controls button.apply-all-btn {
+            flex: 0 0 auto;
+            width: 26px;
+            color: var(--violet);
         }
 
         .loader {
@@ -923,8 +941,8 @@
 
                 <div class="zoom-ctrl">
                     <span>Grid</span>
-                    <input type="range" id="zoomSlider" min="120" max="460" value="168" />
-                    <span id="zoomValue">168px</span>
+                    <input type="range" id="zoomSlider" min="120" max="460" value="300" />
+                    <span id="zoomValue">300px</span>
                 </div>
 
                 <div class="spacer"></div>
@@ -936,6 +954,7 @@
             <div class="topbar-row">
                 <button class="btn btn-ghost btn-sm" id="rotateAllLeftBtn">↺ Rotate All Left</button>
                 <button class="btn btn-ghost btn-sm" id="rotateAllRightBtn">↻ Rotate All Right</button>
+                <button class="btn btn-violet btn-sm" id="cropAllGlobalBtn" title="Applies the most recently drawn crop selection to every page">⧉ Crop All Pages (Same Selection)</button>
                 <button class="btn btn-warn btn-sm" id="resetAllBtn">Reset All Edits</button>
                 <div class="spacer"></div>
                 <div class="status" id="statusBox"></div>
@@ -971,7 +990,7 @@
 
             <div class="modal-zoomgroup">
                 <button class="icon-btn" id="modalZoomOutBtn" title="Zoom out">−</button>
-                <input type="range" id="modalZoomSlider" min="50" max="400" value="100" />
+                <input type="range" id="modalZoomSlider" min="50" max="300" value="100" />
                 <span id="modalZoomValue">100%</span>
                 <button class="icon-btn" id="modalZoomInBtn" title="Zoom in">+</button>
                 <button class="icon-btn" id="modalFitBtn" title="Reset zoom">⤢</button>
@@ -1029,6 +1048,7 @@
         const resetAllBtn = document.getElementById('resetAllBtn');
         const rotateAllLeftBtn = document.getElementById('rotateAllLeftBtn');
         const rotateAllRightBtn = document.getElementById('rotateAllRightBtn');
+        const cropAllGlobalBtn = document.getElementById('cropAllGlobalBtn');
         const progressBar = document.getElementById('progressBar');
         const statusBox = document.getElementById('statusBox');
         const zoomSlider = document.getElementById('zoomSlider');
@@ -1037,14 +1057,16 @@
         let pdfArrayBuffer = null;
         let pdfDoc = null;           // pdf.js document
         let totalPages = 0;
-        let pagePreviewSize = 168;
+        let pagePreviewSize = 300;
 
         const RENDER_PIXEL_RATIO = Math.min(window.devicePixelRatio || 1, 2);
         const resizeObservers = [];
-        let pageStates = [];         // { rotation, removed, crop:{x,y,width,height}|null }
+        let pageStates = [];         // { rotation, removed, crop:{x,y,width,height}|null, cropFrac:{left,top,right,bottom}|null }
         let pdfjsPages = [];         // cached pdf.js page proxies
         let viewports = [];          // current viewport per page (for coordinate conversion)
         let cardEls = [];            // dom refs per page
+        let suppressPageClick = [];  // guards against the crop-drag release re-opening the zoom modal
+        let lastCroppedIndex = -1;   // most recently cropped page, used by the global "Crop All" button
 
         function showStatus(message) {
             statusBox.style.display = 'block';
@@ -1104,6 +1126,8 @@
             pdfjsPages = [];
             viewports = [];
             cardEls = [];
+            suppressPageClick = [];
+            lastCroppedIndex = -1;
 
             fileInfo.style.display = 'flex';
             fileName.textContent = file.name;
@@ -1114,7 +1138,8 @@
                 const pageNum = i + 1;
                 const pdfPage = await pdfDoc.getPage(pageNum);
                 pdfjsPages.push(pdfPage);
-                pageStates.push({ rotation: pdfPage.rotate || 0, removed: false, crop: null });
+                pageStates.push({ rotation: pdfPage.rotate || 0, removed: false, crop: null, cropFrac: null });
+                suppressPageClick.push(false);
                 buildPageCard(i);
                 await renderPage(i);
             }
@@ -1178,6 +1203,7 @@
                 <button class="remove-btn" id="removebtn-${index}">🗑 Remove</button>
                 <button class="rotate-btn" id="rotatebtn-${index}">↻ Rotate</button>
                 <button class="crop-btn" id="cropbtn-${index}">▢ Crop</button>
+                <button class="apply-all-btn" id="applyallbtn-${index}" title="Apply this page's crop to all pages">⧉</button>
                 <button class="crop-clear" id="cropclear-${index}" title="Clear crop">✕</button>
             `;
 
@@ -1193,10 +1219,18 @@
             document.getElementById(`rotatebtn-${index}`).addEventListener('click', (e) => { e.stopPropagation(); rotatePage(index, 90); });
             document.getElementById(`cropbtn-${index}`).addEventListener('click', (e) => { e.stopPropagation(); toggleCropMode(index); });
             document.getElementById(`cropclear-${index}`).addEventListener('click', (e) => { e.stopPropagation(); clearCrop(index); });
+            document.getElementById(`applyallbtn-${index}`).addEventListener('click', (e) => { e.stopPropagation(); applyCropToAllPages(index); });
 
             // Click a page (outside crop mode / crop drag) to open the full-size zoom viewer
             canvasWrap.addEventListener('click', () => {
                 if (canvasWrap.classList.contains('crop-active')) return;
+                // A crop-selection drag just finished on this page — the pointerup that
+                // ended the drag also synthesizes a click here. Swallow that one click
+                // instead of letting it pop open the full-size viewer.
+                if (suppressPageClick[index]) {
+                    suppressPageClick[index] = false;
+                    return;
+                }
                 openModal(index);
             });
 
@@ -1267,6 +1301,7 @@
             document.getElementById(`removebtn-${index}`).classList.toggle('active', state.removed);
             document.getElementById(`removebtn-${index}`).textContent = state.removed ? '✓ Removed' : '🗑 Remove';
             document.getElementById(`cropbtn-${index}`).classList.toggle('active', !!cardEls[index].canvasWrap.classList.contains('crop-active'));
+            document.getElementById(`applyallbtn-${index}`).disabled = !state.crop;
         }
 
         function applyRemovedVisual(index) {
@@ -1314,6 +1349,7 @@
 
         function clearCrop(index) {
             pageStates[index].crop = null;
+            pageStates[index].cropFrac = null;
             redrawCropOverlay(index);
             refreshBadges(index);
             refreshSummary();
@@ -1330,6 +1366,14 @@
                 const fx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
                 const fy = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
                 return [fx, fy];
+            }
+
+            function armClickSuppression() {
+                // The pointerup that ends a crop drag fires a synthetic click right after it,
+                // on the very element we just dragged over. Mark it so the canvasWrap click
+                // handler ignores that one event instead of opening the zoom viewer.
+                suppressPageClick[index] = true;
+                setTimeout(() => { suppressPageClick[index] = false; }, 300);
             }
 
             overlay.addEventListener('pointerdown', (e) => {
@@ -1366,6 +1410,7 @@
                 if ((right - left) < 0.02 || (bottom - top) < 0.02) {
                     canvasWrap.classList.remove('crop-active');
                     refreshBadges(index);
+                    armClickSuppression();
                     return;
                 }
 
@@ -1378,12 +1423,15 @@
                 const yMax = Math.max(p1[1], p2[1]);
 
                 pageStates[index].crop = { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+                pageStates[index].cropFrac = { left, top, right, bottom };
+                lastCroppedIndex = index;
 
                 canvasWrap.classList.remove('crop-active');
                 redrawCropOverlay(index);
                 refreshBadges(index);
                 refreshSummary();
                 if (modalOpen && currentModalIndex === index) redrawModalCropMask(index);
+                armClickSuppression();
             }
 
             overlay.addEventListener('pointerup', finishDrag);
@@ -1413,6 +1461,59 @@
             mask.style.width = ((right - left) * 100) + '%';
             mask.style.height = ((bottom - top) * 100) + '%';
         }
+
+        // ---------- Apply crop to all pages ----------
+
+        function applyCropToAllPages(sourceIndex) {
+            if (totalPages === 0) return;
+            const sourceState = pageStates[sourceIndex];
+
+            if (!sourceState || !sourceState.crop || !sourceState.cropFrac) {
+                showStatus('Draw a crop selection on a page first, then apply it to all pages.');
+                hideStatus();
+                return;
+            }
+
+            const frac = sourceState.cropFrac;
+            let appliedCount = 0;
+
+            for (let i = 0; i < totalPages; i++) {
+                if (i === sourceIndex) { appliedCount++; continue; }
+                const viewport = viewports[i];
+                if (!viewport) continue;
+
+                // Re-derive PDF-space coordinates from the shared fraction against each
+                // page's own viewport, so rotation/size differences per page are respected.
+                const p1 = fractionToPdfPoint(viewport, frac.left, frac.top);
+                const p2 = fractionToPdfPoint(viewport, frac.right, frac.bottom);
+                const xMin = Math.min(p1[0], p2[0]);
+                const xMax = Math.max(p1[0], p2[0]);
+                const yMin = Math.min(p1[1], p2[1]);
+                const yMax = Math.max(p1[1], p2[1]);
+
+                pageStates[i].crop = { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+                pageStates[i].cropFrac = { ...frac };
+
+                redrawCropOverlay(i);
+                refreshBadges(i);
+                if (modalOpen && currentModalIndex === i) redrawModalCropMask(i);
+                appliedCount++;
+            }
+
+            lastCroppedIndex = sourceIndex;
+            refreshSummary();
+            showStatus(`Crop from Page ${sourceIndex + 1} applied to ${appliedCount} page(s)`);
+            hideStatus();
+        }
+
+        cropAllGlobalBtn.addEventListener('click', () => {
+            if (lastCroppedIndex === -1 || !pageStates[lastCroppedIndex] || !pageStates[lastCroppedIndex].crop) {
+                showStatus('Draw a crop selection on any page first, then use this to copy it everywhere.');
+                hideStatus();
+                return;
+            }
+            applyCropToAllPages(lastCroppedIndex);
+        });
 
         // ---------- Summary panel ----------
 
@@ -1467,9 +1568,10 @@
             if (totalPages === 0) return;
             for (let i = 0; i < totalPages; i++) {
                 const pdfPage = pdfjsPages[i];
-                pageStates[i] = { rotation: pdfPage.rotate || 0, removed: false, crop: null };
+                pageStates[i] = { rotation: pdfPage.rotate || 0, removed: false, crop: null, cropFrac: null };
                 await renderPage(i);
             }
+            lastCroppedIndex = -1;
             refreshSummary();
         });
 
@@ -1554,13 +1656,15 @@
             pdfjsPages = [];
             viewports = [];
             cardEls = [];
+            suppressPageClick = [];
+            lastCroppedIndex = -1;
 
             pagesContainer.innerHTML = '';
             placeholder.style.display = 'flex';
             fileInfo.style.display = 'none';
             progressBar.value = 0;
             progressBar.style.display = 'none';
-            updateZoom(168);
+            updateZoom(300);
             refreshSummary();
         });
 
